@@ -5,12 +5,16 @@ const shelves = [
 ];
 
 function getProgressBarColor(usagePercentage) {
-    if (usagePercentage >= 0 && usagePercentage <= 30) {
-        return 'red'; // Vermelho para 0-30%
-    } else if (usagePercentage > 30 && usagePercentage <= 60) {
-        return 'yellow'; // Amarelo para 31-60%
+    if (typeof usagePercentage !== 'number' || usagePercentage < 0 || usagePercentage > 100) {
+        return 'gray'; // cor padrão para erro
+    }
+
+    if (usagePercentage <= 30) {
+        return 'red';
+    } else if (usagePercentage <= 60) {
+        return 'yellow';
     } else {
-        return 'green'; // Verde para 61-100%
+        return 'green';
     }
 }
 
@@ -20,8 +24,10 @@ function createShelfCard(shelf) {
     const usagePercentage = shelf.porcentagem || 0;
     const progressBarColor = getProgressBarColor(usagePercentage);
 
+   
+
     const card = document.createElement('div');
-    card.className = 'shelf-card';
+    card.classList.add('shelf-card');
 
     card.innerHTML = `
         <div class="shelf-header">
@@ -31,11 +37,20 @@ function createShelfCard(shelf) {
             <div class="shelf-info">
                 <div>
                     <span>Capacidade:</span>
-                    <span>${capacity}</span>
+                    <span>${capacity} kg</span>
                 </div>
                 <div>
                     <span>Em uso:</span>
-                    <span id="peso-atual-${shelf.id}">${pesoAtual} kg</span>
+                  <span id="peso-atual-${shelf.id}">
+  ${
+    !pesoAtual || Number(pesoAtual) === 0
+      ? '0 kg'
+      : Number(pesoAtual) < 1
+        ? `${(Number(pesoAtual) * 1000).toLocaleString('pt-BR')} g`
+        : `${Number(pesoAtual).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
+  }
+</span>
+
                 </div>
             </div>
             <div class="progress-bar">
@@ -52,6 +67,15 @@ function createShelfCard(shelf) {
     return card;
 }
 
+
+function formatarPesoSeguro(peso) {
+  const valor = Number(peso);
+  if (!valor || valor === 0) return '0 kg';
+  if (valor < 1) return `${(valor * 1000).toLocaleString('pt-BR')} g`;
+  return `${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`;
+}
+
+
 function renderShelves() {
     const container = document.getElementById('shelves-container');
     container.innerHTML = '';
@@ -59,6 +83,36 @@ function renderShelves() {
         container.appendChild(createShelfCard(shelf));
     });
 }
+function renderShelvesCustom(listaFiltrada) {
+  const container = document.getElementById('shelves-container');
+  container.innerHTML = '';
+  listaFiltrada.forEach(shelf => {
+    container.appendChild(createShelfCard(shelf));
+  });
+}
+
+function renderShelves(corFiltro = 'todas') {
+  const container = document.getElementById('shelves-container');
+  container.innerHTML = '';
+
+  const prateleirasFiltradas = shelves.filter(shelf => {
+    const cor = getProgressBarColor(shelf.porcentagem || 0);
+    return corFiltro === 'todas' || cor === corFiltro;
+  });
+
+  prateleirasFiltradas.forEach(shelf => {
+    container.appendChild(createShelfCard(shelf));
+  });
+}
+
+
+
+function filtrarShelvesPorCor(cor) {
+  renderShelves(cor);
+}
+
+
+
 
 function atualizarPesoAtual() {
     const shelvesRef = database.ref("Prateleira");
@@ -69,24 +123,31 @@ function atualizarPesoAtual() {
         
         if (data) {
             shelves.length = 0; // Clear existing shelves array
-            for (const id in data) {
-                if (data.hasOwnProperty(id)) {
-                    shelves.push({
-                        id: id,
-                        nome: data[id].nome || `Prateleira ${id}`,
-                        pesoAtual: data[id].pesoAtual || 0,
-                        capacidade: data[id].capacidade || '1kg',
-                        porcentagem: data[id].porcentagem || 0
-                    });
-                }
-            }
+           for (const id in data) {
+  if (data.hasOwnProperty(id)) {
+    console.log(`Prateleira ${id} - pesoAtual:`, data[id].pesoAtual);
+
+    shelves.push({
+      id: id,
+      nome: data[id].nome || `Prateleira ${id}`,
+      pesoAtual: data[id].pesoAtual || 0,
+      capacidade: data[id].capacidade || 1,
+      porcentagem: data[id].porcentagem || 0
+    });
+  }
+}
+
             renderShelves();
+           
         }
     }, (error) => {
         console.error("Erro ao acessar o Firebase:", error);
     });
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    atualizarPesoAtual();
+});
 document.addEventListener('DOMContentLoaded', () => {
     atualizarPesoAtual();
 });
